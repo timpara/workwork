@@ -1,0 +1,16 @@
+[project]
+name = "work-hours-tracker"
+version = "1.0.0"
+description = "A working hours tracker with 7.6h daily target"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1",
+    "gunicorn>=23.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
