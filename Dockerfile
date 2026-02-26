@@ -16,6 +16,6 @@ RUN mkdir -p /app/data
 
 ENV DB_PATH=/app/data/hours.db
 
-EXPOSE 8080
+EXPOSE 9090
 
-CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "120", "app.app:app"]
+CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:9090", "--workers", "2", "--timeout", "120", "app.app:app"]

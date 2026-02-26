@@ -22,7 +22,7 @@ A local-first web app for tracking daily working hours against a configurable ta
 docker compose up -d
 ```
 
-The app will be available at [http://localhost:8080](http://localhost:8080). Data is persisted in `./data/hours.db` via a volume mount.
+The app will be available at [http://localhost:9090](http://localhost:9090). Data is persisted in `./data/hours.db` via a volume mount.
 
 ### Local (without Docker)
 
@@ -30,10 +30,10 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
-uv run gunicorn --bind 0.0.0.0:8080 app.app:app
+uv run gunicorn --bind 0.0.0.0:9090 app.app:app
 ```
 
-Open [http://localhost:8080](http://localhost:8080).
+Open [http://localhost:9090](http://localhost:9090).
 
 ## Running Tests
 
