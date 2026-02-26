@@ -1,0 +1,11 @@
+services:
+  work-hours:
+    build: .
+    container_name: work-hours-tracker
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DB_PATH=/app/data/hours.db
+    restart: unless-stopped
