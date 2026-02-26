@@ -39,6 +39,38 @@ def init_db():
             reason TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('daily_target', '7.6');
     """)
     conn.commit()
     conn.close()
+
+
+def get_setting(key: str, default: str = "") -> str:
+    """Read a setting value from the database."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = ?", (key,)
+        ).fetchone()
+        return row["value"] if row else default
+    finally:
+        conn.close()
+
+
+def set_setting(key: str, value: str) -> None:
+    """Upsert a setting value in the database."""
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            (key, value),
+        )
+        conn.commit()
+    finally:
+        conn.close()

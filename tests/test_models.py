@@ -16,7 +16,7 @@ from app.models import (
 def test_calculate_hours_exact_target():
     """08:00-16:06 with 30min break = 7.6h, overtime = 0."""
     total, overtime = calculate_hours(
-        "08:00", "16:06", [{"start": "12:00", "end": "12:30"}]
+        "08:00", "16:06", [{"start": "12:00", "end": "12:30"}], daily_target=7.6
     )
     assert total == 7.6
     assert overtime == 0.0
@@ -25,7 +25,7 @@ def test_calculate_hours_exact_target():
 def test_calculate_hours_overtime():
     """08:00-17:06 with 30min break = 8.6h, overtime = +1.0."""
     total, overtime = calculate_hours(
-        "08:00", "17:06", [{"start": "12:00", "end": "12:30"}]
+        "08:00", "17:06", [{"start": "12:00", "end": "12:30"}], daily_target=7.6
     )
     assert total == 8.6
     assert overtime == 1.0
@@ -34,7 +34,7 @@ def test_calculate_hours_overtime():
 def test_calculate_hours_undertime():
     """08:00-15:00 with 30min break = 6.5h, overtime = -1.1."""
     total, overtime = calculate_hours(
-        "08:00", "15:00", [{"start": "12:00", "end": "12:30"}]
+        "08:00", "15:00", [{"start": "12:00", "end": "12:30"}], daily_target=7.6
     )
     assert total == 6.5
     assert overtime == -1.1
@@ -42,7 +42,7 @@ def test_calculate_hours_undertime():
 
 def test_calculate_hours_no_breaks():
     """08:00-15:36 with no breaks = 7.6h, overtime = 0."""
-    total, overtime = calculate_hours("08:00", "15:36", [])
+    total, overtime = calculate_hours("08:00", "15:36", [], daily_target=7.6)
     assert total == 7.6
     assert overtime == 0.0
 
@@ -53,7 +53,7 @@ def test_calculate_hours_multiple_breaks():
         {"start": "10:00", "end": "10:15"},
         {"start": "12:00", "end": "12:30"},
     ]
-    total, overtime = calculate_hours("08:00", "16:21", breaks)
+    total, overtime = calculate_hours("08:00", "16:21", breaks, daily_target=7.6)
     assert total == 7.6
     assert overtime == 0.0
 
@@ -61,10 +61,19 @@ def test_calculate_hours_multiple_breaks():
 def test_calculate_hours_overnight():
     """22:00-06:30 with 30min break = 8.0h (overnight shift)."""
     total, overtime = calculate_hours(
-        "22:00", "06:30", [{"start": "02:00", "end": "02:30"}]
+        "22:00", "06:30", [{"start": "02:00", "end": "02:30"}], daily_target=7.6
     )
     assert total == 8.0
     assert overtime == 0.4
+
+
+def test_calculate_hours_custom_target():
+    """With daily_target=8.0, 7.6h worked gives overtime = -0.4."""
+    total, overtime = calculate_hours(
+        "08:00", "16:06", [{"start": "12:00", "end": "12:30"}], daily_target=8.0
+    )
+    assert total == 7.6
+    assert overtime == -0.4
 
 
 # ─── calculate_break_minutes ─────────────────────────────────────────────────

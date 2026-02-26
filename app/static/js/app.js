@@ -1,6 +1,5 @@
 /* ─── Work Hours Tracker - Frontend Logic ─────────────────────────────── */
 
-const DAILY_TARGET = 7.6;
 const API = '/api';
 
 // ─── State ───────────────────────────────────────────────────────────────
@@ -8,6 +7,7 @@ const API = '/api';
 let state = {
     entries: [],
     editingId: null,
+    dailyTarget: 7.6,
     calYear: new Date().getFullYear(),
     calMonth: new Date().getMonth(), // 0-indexed
     weeklyYear: new Date().getFullYear(),
@@ -16,13 +16,15 @@ let state = {
 
 // ─── Init ────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
     initTabs();
     initForm();
     initAdjustmentForm();
     initExport();
-    setDefaultDate();
+    initTargetEdit();
+    await loadSettings();
+    setDefaults();
     loadTotalSummary();
     loadEntries();
     loadAdjustments();
@@ -44,6 +46,113 @@ function initTheme() {
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
     });
+}
+
+// ─── Settings ────────────────────────────────────────────────────────────
+
+async function loadSettings() {
+    try {
+        const res = await fetch(`${API}/settings`);
+        const data = await res.json();
+        state.dailyTarget = data.daily_target;
+    } catch { /* use default */ }
+}
+
+function initTargetEdit() {
+    const stat = document.getElementById('targetStat');
+    stat.addEventListener('click', () => {
+        // Already editing?
+        if (stat.querySelector('.stat-edit-input')) return;
+
+        const valueEl = document.getElementById('dailyTarget');
+        const currentVal = state.dailyTarget;
+        const originalHTML = stat.innerHTML;
+
+        stat.innerHTML = `
+            <input type="number" class="stat-edit-input" value="${currentVal}" step="0.1" min="0.1" max="24" autofocus>
+            <div class="stat-edit-actions">
+                <button class="stat-edit-save" title="Save">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                </button>
+                <button class="stat-edit-cancel" title="Cancel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+        `;
+
+        const input = stat.querySelector('.stat-edit-input');
+        input.focus();
+        input.select();
+
+        const cancel = () => {
+            stat.innerHTML = originalHTML;
+            document.getElementById('dailyTarget').textContent = state.dailyTarget.toFixed(2);
+        };
+
+        const save = () => {
+            const val = parseFloat(input.value);
+            if (isNaN(val) || val <= 0 || val > 24) {
+                showToast('Target must be between 0 and 24 hours', 'error');
+                return;
+            }
+            saveTarget(val);
+        };
+
+        stat.querySelector('.stat-edit-save').addEventListener('click', (e) => {
+            e.stopPropagation();
+            save();
+        });
+        stat.querySelector('.stat-edit-cancel').addEventListener('click', (e) => {
+            e.stopPropagation();
+            cancel();
+        });
+        input.addEventListener('click', (e) => e.stopPropagation());
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') cancel();
+        });
+    });
+}
+
+async function saveTarget(value) {
+    try {
+        const res = await fetch(`${API}/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ daily_target: value }),
+        });
+
+        if (!res.ok) {
+            const data = await res.json();
+            showToast(data.error || 'Failed to save target', 'error');
+            return;
+        }
+
+        state.dailyTarget = value;
+        showToast(`Daily target set to ${value}h`, 'success');
+
+        // Restore the stat display
+        const stat = document.getElementById('targetStat');
+        stat.innerHTML = `
+            <span class="stat-value" id="dailyTarget">${value.toFixed(2)}</span>
+            <span class="stat-label">daily target
+                <svg class="stat-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+            </span>
+        `;
+
+        // Refresh dependent views
+        updatePreview();
+        loadTotalSummary();
+    } catch {
+        showToast('Network error. Please try again.', 'error');
+    }
 }
 
 // ─── Tabs ────────────────────────────────────────────────────────────────
@@ -90,8 +199,11 @@ function initForm() {
     });
 }
 
-function setDefaultDate() {
+function setDefaults() {
     document.getElementById('entryDate').value = todayStr();
+    document.getElementById('startTime').value = '08:00';
+    document.getElementById('endTime').value = '16:00';
+    updatePreview();
 }
 
 function addBreakRow(defaultStart = '', defaultEnd = '') {
@@ -160,7 +272,7 @@ function updatePreview() {
 
     const netMin = grossMin - breakMin;
     const netHours = netMin / 60;
-    const balance = netHours - DAILY_TARGET;
+    const balance = netHours - state.dailyTarget;
 
     setPreviewValues(
         formatMinutes(grossMin),
@@ -235,8 +347,7 @@ function cancelEdit() {
     document.getElementById('cancelEditBtn').style.display = 'none';
     document.getElementById('entryForm').reset();
     document.getElementById('breaksContainer').innerHTML = '';
-    setDefaultDate();
-    updatePreview();
+    setDefaults();
 }
 
 function editEntry(entry) {

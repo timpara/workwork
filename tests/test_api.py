@@ -296,3 +296,65 @@ def test_export_csv_with_adjustments(client):
     assert rows[2][0] == "ADJUSTMENT"
     assert rows[2][5] == "5.0"
     assert rows[2][6] == "Comp time"
+
+
+# ─── Settings ─────────────────────────────────────────────────────────────────
+
+
+def test_get_settings(client):
+    """GET /api/settings returns default daily_target of 7.6."""
+    res = client.get("/api/settings")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["daily_target"] == 7.6
+
+
+def test_update_settings(client):
+    """PUT /api/settings updates the daily target and GET confirms."""
+    res = client.put(
+        "/api/settings",
+        data=json.dumps({"daily_target": 8.0}),
+        content_type="application/json",
+    )
+    assert res.status_code == 200
+    assert res.get_json()["daily_target"] == 8.0
+
+    # Confirm persisted
+    res = client.get("/api/settings")
+    assert res.get_json()["daily_target"] == 8.0
+
+
+def test_update_settings_invalid(client):
+    """PUT /api/settings rejects invalid values."""
+    # Zero
+    res = client.put(
+        "/api/settings",
+        data=json.dumps({"daily_target": 0}),
+        content_type="application/json",
+    )
+    assert res.status_code == 400
+
+    # Over 24
+    res = client.put(
+        "/api/settings",
+        data=json.dumps({"daily_target": 25}),
+        content_type="application/json",
+    )
+    assert res.status_code == 400
+
+
+def test_entry_with_custom_target(client):
+    """With target=8.0, 7.6h worked gives overtime -0.4 instead of 0.0."""
+    # Change target to 8.0
+    client.put(
+        "/api/settings",
+        data=json.dumps({"daily_target": 8.0}),
+        content_type="application/json",
+    )
+
+    # Create entry: 08:00-16:06, 30min break = 7.6h worked
+    res = post_entry(client)
+    assert res.status_code == 201
+    data = res.get_json()
+    assert data["total_hours"] == 7.6
+    assert data["overtime"] == -0.4

@@ -22,7 +22,10 @@ def calculate_break_minutes(breaks: list[dict]) -> float:
 
 
 def calculate_hours(
-    start_time: str, end_time: str, breaks: list[dict]
+    start_time: str,
+    end_time: str,
+    breaks: list[dict],
+    daily_target: float = DAILY_TARGET,
 ) -> tuple[float, float]:
     """
     Calculate total worked hours and overtime.
@@ -39,7 +42,7 @@ def calculate_hours(
     break_minutes = calculate_break_minutes(breaks)
     worked_minutes = total_minutes - break_minutes
     worked_hours = round(worked_minutes / 60.0, 2)
-    overtime = round(worked_hours - DAILY_TARGET, 2)
+    overtime = round(worked_hours - daily_target, 2)
 
     return max(worked_hours, 0), overtime
 

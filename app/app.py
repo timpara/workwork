@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from flask import Flask, render_template, request, jsonify, Response
 
-from .database import get_db, init_db
+from .database import get_db, get_setting, set_setting, init_db
 from .models import (
     calculate_hours,
     entry_to_dict,
@@ -73,8 +73,9 @@ def create_entry():
         return jsonify({"error": error}), 400
 
     breaks = data.get("breaks", [])
+    daily_target = float(get_setting("daily_target", str(DAILY_TARGET)))
     total_hours, overtime = calculate_hours(
-        data["start_time"], data["end_time"], breaks
+        data["start_time"], data["end_time"], breaks, daily_target
     )
 
     db = get_db()
@@ -119,8 +120,9 @@ def update_entry(entry_id):
         return jsonify({"error": error}), 400
 
     breaks = data.get("breaks", [])
+    daily_target = float(get_setting("daily_target", str(DAILY_TARGET)))
     total_hours, overtime = calculate_hours(
-        data["start_time"], data["end_time"], breaks
+        data["start_time"], data["end_time"], breaks, daily_target
     )
 
     db = get_db()
@@ -243,6 +245,35 @@ def delete_adjustment(adj_id):
         db.close()
 
 
+# ─── API: Settings ───────────────────────────────────────────────────────────
+
+
+@app.get("/api/settings")
+def get_settings():
+    """Get application settings."""
+    daily_target = float(get_setting("daily_target", str(DAILY_TARGET)))
+    return jsonify({"daily_target": daily_target})
+
+
+@app.put("/api/settings")
+def update_settings():
+    """Update application settings."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    if "daily_target" in data:
+        val = data["daily_target"]
+        if not isinstance(val, (int, float)) or val <= 0 or val > 24:
+            return jsonify(
+                {"error": "daily_target must be a number between 0 and 24"}
+            ), 400
+        set_setting("daily_target", str(float(val)))
+
+    daily_target = float(get_setting("daily_target", str(DAILY_TARGET)))
+    return jsonify({"daily_target": daily_target})
+
+
 # ─── API: Summaries ─────────────────────────────────────────────────────────
 
 
@@ -264,6 +295,7 @@ def weekly_summary():
             rows = db.execute("SELECT * FROM time_entries ORDER BY date").fetchall()
 
         entries = [entry_to_dict(r) for r in rows]
+        daily_target = float(get_setting("daily_target", str(DAILY_TARGET)))
         weeks = defaultdict(
             lambda: {"entries": [], "total_hours": 0, "target": 0, "overtime": 0}
         )
@@ -283,7 +315,7 @@ def weekly_summary():
             weeks[week_key]["sunday"] = sunday.strftime("%Y-%m-%d")
             weeks[week_key]["entries"].append(entry)
             weeks[week_key]["total_hours"] += entry["total_hours"]
-            weeks[week_key]["target"] += DAILY_TARGET
+            weeks[week_key]["target"] += daily_target
 
         # Compute overtime per week
         result = []
@@ -308,13 +340,14 @@ def monthly_summary():
         rows = db.execute("SELECT * FROM time_entries ORDER BY date").fetchall()
 
         entries = [entry_to_dict(r) for r in rows]
+        daily_target = float(get_setting("daily_target", str(DAILY_TARGET)))
         months = defaultdict(lambda: {"total_hours": 0, "target": 0, "days_worked": 0})
 
         for entry in entries:
             month_key = entry["date"][:7]  # YYYY-MM
             months[month_key]["month"] = month_key
             months[month_key]["total_hours"] += entry["total_hours"]
-            months[month_key]["target"] += DAILY_TARGET
+            months[month_key]["target"] += daily_target
             months[month_key]["days_worked"] += 1
 
         result = []
@@ -352,7 +385,7 @@ def total_summary():
                 "combined_balance": round(entries_overtime + manual_adj, 2),
                 "total_hours": round(row["total_hours"], 2),
                 "total_days": row["total_days"],
-                "daily_target": DAILY_TARGET,
+                "daily_target": float(get_setting("daily_target", str(DAILY_TARGET))),
             }
         )
     finally:
